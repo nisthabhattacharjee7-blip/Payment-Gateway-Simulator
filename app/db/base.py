@@ -6,3 +6,4 @@ class Base(DeclarativeBase):
     SQLAlchemy uses this class to keep track of all tables and their structures.
     """
     pass
+
