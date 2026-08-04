@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
-from app.config.enums import RefundStatus
+from app.config.enums import RefundStatus, Currency
 
 class RefundCreate(BaseModel):
     amount: int = Field(gt=0)
