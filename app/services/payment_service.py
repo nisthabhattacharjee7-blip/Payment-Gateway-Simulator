@@ -1,24 +1,72 @@
-import random
-import time 
-from app.config.enums import PaymentStatus
+from sqlalchemy.orm import Session
 
-class ProcessorTimeoutError(Exception):
-    """Raised when the simulated bank takes too long to respond."""
-    pass
+from app.models.payment import Payment
+from app.models.refund import Refund
+from app.config.enums import PaymentStatus, Currency
+from app.services import state_machine
+from app.services import ledger_service
+from app.services.processor_service import (
+    simulate_bank_authorization,
+    ProcessorTimeoutError,
+)
 
-def simulate_bank_authorization(amount: int) -> PaymentStatus:
+
+def create_payment(
+    db: Session,
+    merchant_id: str,
+    amount: int,
+    currency: Currency,
+    receipt: str | None = None,
+    description: str | None = None,
+) -> Payment:
+    
     """
-    Fake bank call. Randomly returns AUTHORIZED, FAILED, or raises a timeout,
-    simulating what a real payment processor might do.
+    Creates a new payment in the CREATED state. Does not talk to the
+    processor yet, that happens in a separate authorize_payment call.
     """
-    outcome_roll = random.random()
+    payment = Payment(
+        merchant_id=merchant_id,
+        amount=amount,
+        currency=currency,
+        receipt=receipt,
+        description=description,
+        status=PaymentStatus.CREATED,
+    )
+    db.add(payment)
+    db.flush()
+    return payment
 
-    time.sleep(random.uniform(0.1, 0.5))
 
-    if outcome_roll < 0.05:
-        raise ProcessorTimeoutError("Bank did not respond in time")
+def authorize_payment(db: Session, payment: Payment) -> Payment:
+    """
+    Sends the payment to the (simulated) bank for authorization.
+    On success, moves it to AUTHORIZED. On decline, moves it to FAILED.
+    On timeout, leaves the payment status untouched.The outcome is
+    unknown, and it's not safe to assume either success or failure.
+    """
 
-    if outcome_roll < 0.20:
-        return PaymentStatus.FAILED
+    try:
+        outcome = simulate_bank_authorization(payment.amount)
+    except ProcessorTimeoutError:
+        return payment
 
-    return PaymentStatus.AUTHORIZED
+    new_status = state_machine.transition(payment.status, outcome)
+    payment.status = new_status
+    db.flush()
+    return payment
+
+
+def capture_payment(db: Session, payment: Payment) -> Payment:
+
+    """
+    Captures a previously authorized payment: moves it to CAPTURED
+    and records the corresponding double-entry ledger transaction.
+    """
+
+    new_status = state_machine.transition(payment.status, PaymentStatus.CAPTURED)
+    payment.status = new_status
+
+    ledger_service.record_capture(db, payment)
+
+    db.flush()
+    return payment
