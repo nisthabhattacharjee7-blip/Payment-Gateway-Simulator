@@ -43,3 +43,51 @@ def create_webhook_log(
     db.add(log)
     db.flush()
     return log
+
+async def send_webhook(log: WebhookLog, webhook_url: str, db: Session):
+    """
+    Attempts to deliver a single webhook. On success, marks it DELIVERED.
+    On failure, increments the attempt count and schedules a retry with
+    exponential backoff, or marks it permanently FAILED if attempts are
+    exhausted.
+    """
+    log.attempt_count += 1
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                webhook_url,
+                content=log.payload,
+                headers={"Content-Type": "application/json"},
+            )
+
+        log.response_status_code = response.status_code
+        log.response_body = response.text[:1000]
+
+        if 200 <= response.status_code < 300:
+            log.status = WebhookStatus.DELIVERED
+            log.next_retry_at = None
+        else:
+            _schedule_retry_or_fail(log)
+
+    except httpx.RequestError as exc:
+        log.response_status_code = None
+        log.response_body = str(exc)[:1000]
+        _schedule_retry_or_fail(log)
+
+    db.flush()
+
+def _schedule_retry_or_fail(log: WebhookLog) -> None:
+    """
+    Decides whether to schedule another retry attempt or give up,
+    based on how many attempts have already been made.
+    """
+    if log.attempt_count >= MAX_WEBHOOK_ATTEMPTS:
+        log.status = WebhookStatus.FAILED
+        log.next_retry_at = None
+    else:
+        log.status = WebhookStatus.RETRYING
+        backoff_seconds = calculate_backoff_seconds(log.attempt_count)
+        log.next_retry_at = datetime.now(timezone.utc) + timedelta(
+            seconds=backoff_seconds
+        )
