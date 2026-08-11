@@ -6,9 +6,11 @@ from app.models.merchant import Merchant
 from app.models.payment import Payment
 from app.schemas.payment_schema import PaymentCreate, PaymentResponse
 from app.middlewares.auth_middleware import get_current_merchant
+from app.middlewares.idempotency_middleware import check_idempotency
 from app.services import payment_service
 from app.services import webhook_service
 from app.services import state_machine
+from app.services import idempotency_service
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -33,9 +35,12 @@ def create_payment(
     payload: PaymentCreate,
     merchant: Merchant = Depends(get_current_merchant),
     db: Session = Depends(get_db),
+    idempotency_record=Depends(check_idempotency),
 ):
     """
     Creates a new payment in the CREATED state for the authenticated merchant.
+    Protected by idempotency: retrying with the same Idempotency-Key header
+    will replay the original response instead of creating a duplicate payment.
     """
     payment = payment_service.create_payment(
         db=db,
@@ -47,6 +52,13 @@ def create_payment(
     )
     db.commit()
     db.refresh(payment)
+
+    response_data = PaymentResponse.model_validate(payment).model_dump(mode="json")
+    idempotency_service.save_idempotency_response(
+        db, idempotency_record, status_code=201, response_body=response_data
+    )
+    db.commit()
+
     return payment
 
 
