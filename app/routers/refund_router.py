@@ -7,6 +7,7 @@ from app.models.payment import Payment
 from app.schemas.refund_schema import RefundCreate, RefundResponse
 from app.middlewares.auth_middleware import get_current_merchant
 from app.services import payment_service
+from app.services import webhook_service
 from app.services import state_machine
 
 router = APIRouter(prefix="/payments", tags=["refunds"])
@@ -30,7 +31,7 @@ def _get_owned_payment(db: Session, payment_id: str, merchant: Merchant) -> Paym
 @router.post(
     "/{payment_id}/refunds", response_model=RefundResponse, status_code=201
 )
-def create_refund(
+async def create_refund(
     payment_id: str,
     payload: RefundCreate,
     merchant: Merchant = Depends(get_current_merchant),
@@ -57,4 +58,15 @@ def create_refund(
 
     db.commit()
     db.refresh(refund)
+    db.refresh(payment)
+
+    event_type = f"payment.{payment.status.value}"
+    webhook_payload = webhook_service.build_webhook_payload(payment, event_type)
+    log = webhook_service.create_webhook_log(db, payment, event_type, webhook_payload)
+    db.commit()
+
+    if merchant.webhook_url:
+        await webhook_service.attempt_delivery(db, log, merchant.webhook_url)
+        db.commit()
+
     return refund
