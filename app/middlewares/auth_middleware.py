@@ -10,7 +10,7 @@ def get_current_merchant(
     db: Session = Depends(get_db),
 ) -> Merchant:
     """
-    FastAPI dependency that authenticates a request using the
+    FastAPI dependency , authenticates a request using the
     X-API-Key header, returning the matching Merchant.
     Raises 401 if the key is missing or invalid.
     """
