@@ -75,7 +75,7 @@ def get_payment(
 
 
 @router.post("/{payment_id}/authorize", response_model=PaymentResponse)
-def authorize_payment(
+async def authorize_payment(
     payment_id: str,
     merchant: Merchant = Depends(get_current_merchant),
     db: Session = Depends(get_db),
@@ -95,14 +95,18 @@ def authorize_payment(
 
     event_type = f"payment.{payment.status.value}"
     webhook_payload = webhook_service.build_webhook_payload(payment, event_type)
-    webhook_service.create_webhook_log(db, payment, event_type, webhook_payload)
+    log = webhook_service.create_webhook_log(db, payment, event_type, webhook_payload)
     db.commit()
+
+    if merchant.webhook_url:
+        await webhook_service.attempt_delivery(db, log, merchant.webhook_url)
+        db.commit()
+        db.refresh(payment)
 
     return payment
 
-
 @router.post("/{payment_id}/capture", response_model=PaymentResponse)
-def capture_payment(
+async def capture_payment(
     payment_id: str,
     merchant: Merchant = Depends(get_current_merchant),
     db: Session = Depends(get_db),
@@ -122,7 +126,12 @@ def capture_payment(
 
     event_type = f"payment.{payment.status.value}"
     webhook_payload = webhook_service.build_webhook_payload(payment, event_type)
-    webhook_service.create_webhook_log(db, payment, event_type, webhook_payload)
+    log = webhook_service.create_webhook_log(db, payment, event_type, webhook_payload)
     db.commit()
+
+    if merchant.webhook_url:
+        await webhook_service.attempt_delivery(db, log, merchant.webhook_url)
+        db.commit()
+        db.refresh(payment)
 
     return payment
