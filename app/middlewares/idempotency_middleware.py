@@ -6,7 +6,7 @@ from app.middlewares.auth_middleware import get_current_merchant
 from app.models.idempotency_key import IdempotencyKey
 from app.services import idempotency_service
 from app.services import idempotency_service
-from app.services.idempotency_service import IdempotencyService
+from app.services import IdempotencyService
 
 
 class IdempotentReplayResponse(Exception):
