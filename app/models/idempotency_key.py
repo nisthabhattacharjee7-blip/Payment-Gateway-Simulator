@@ -13,8 +13,8 @@ class IdempotencyKey(Base):
     merchant_id: Mapped[str] = mapped_column(String, ForeignKey("merchants.id"), nullable=False)
     request_path : Mapped[str] = mapped_column(String, nullable=False)
     request_body_hash: Mapped[str] = mapped_column(String, nullable=False)
-    response_status_code: Mapped[int] = mapped_column(Integer, nullable=False)
-    response_body: Mapped[str] = mapped_column(String, nullable=False)
+    response_status_code: Mapped[int] = mapped_column(Integer, nullable=True)
+    response_body: Mapped[str] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
                                                 default=lambda: datetime.now(timezone.utc))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
