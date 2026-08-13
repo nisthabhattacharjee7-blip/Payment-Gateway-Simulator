@@ -13,8 +13,10 @@ class RefundStatus(str, Enum):
     INITIATED = "initiated"
     PROCESSED = "processed"
     FAILED = "failed"
+    PENDING = "pending"
 
 class Currency(str, Enum):
+    INR = "INR"
     USD = "USD"
     EUR = "EUR"
     GBP = "GBP"
