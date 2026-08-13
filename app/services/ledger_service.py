@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from app.db import session
 from app.models.ledger_entry import LedgerEntry
 from app.models.wallet import Wallet
-from app.config.enums import LedgerEntryType, LedgerEntryStatus
+from app.config.enums import LedgerEntryType
 
 
 def get_or_create_wallet(db: Session, merchant_id: str):
