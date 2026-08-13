@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import ForeignKey, String, DateTime, Integer, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
-from app.config.enums import Webhookstatus
+from app.config.enums import WebhookStatus
 from app.models.merchant import Merchant
 from app.models.payment import Payment 
 
@@ -16,7 +16,7 @@ class WebhookLog(Base):
     merchant_id: Mapped[str] = mapped_column(String, ForeignKey("merchants.id"), nullable=False)
     event_type: Mapped[str] = mapped_column(String, nullable=False)
     payload: Mapped[str] = mapped_column(String, nullable=False)
-    status: Mapped[Webhookstatus] = mapped_column(SAEnum(Webhookstatus), default=Webhookstatus.PENDING, nullable=False)
+    status: Mapped[WebhookStatus] = mapped_column(SAEnum(WebhookStatus), default=WebhookStatus.PENDING, nullable=False)
     attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     response_status_code: Mapped[int] = mapped_column(Integer, nullable=True)
     response_body: Mapped[str] = mapped_column(String, nullable=True)
