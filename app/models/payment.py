@@ -1,9 +1,9 @@
 import uuid 
 from datetime import datetime, timezone
-from sqlalchemy import ForeignKey, String, DateTime, ForeinKey, Integer, Enum as SAEnum
+from sqlalchemy import ForeignKey, String, DateTime, ForeignKey, Integer, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
-from app.config.enums import Currency, PaymentStatus, PaymentMethod
+from app.config.enums import Currency, PaymentStatus
 from app.models.merchant import Merchant
 
 
