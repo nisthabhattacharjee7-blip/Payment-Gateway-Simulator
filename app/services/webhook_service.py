@@ -3,7 +3,7 @@ import httpx
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from app.models.webhook_log import WebhookLog
-from app.config.enums import WebhookStatus, Webhookstatus
+from app.config.enums import WebhookStatus, WebhookStatus
 from app.schemas.webhook_schema import  WebhookPayload
 from app.utils.retry import calculate_backoff_seconds
 
