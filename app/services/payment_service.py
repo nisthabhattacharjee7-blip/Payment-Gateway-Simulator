@@ -5,7 +5,7 @@ from app.models.refund import Refund
 from app.config.enums import PaymentStatus, Currency
 from app.services import state_machine
 from app.services import ledger_service
-from app.services.processor_service import (
+from app.services.processor_simulator import (
     simulate_bank_authorization,
     ProcessorTimeoutError,
 )
