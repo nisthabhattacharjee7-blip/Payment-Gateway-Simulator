@@ -1,10 +1,10 @@
 from datetime import datetime
-from pydantic import BaseModel , ConfigDict , Emailstr
+from pydantic import BaseModel , ConfigDict , EmailStr
 
 
 class MerchantCreate(BaseModel):
     name: str
-    email: Emailstr
+    email: EmailStr
     webhook_url: str  | None = None
 
 class MerchantResponse(MerchantCreate):
@@ -12,7 +12,7 @@ class MerchantResponse(MerchantCreate):
     id: str
     name: str
     api_key: str
-    email: Emailstr
+    email: EmailStr
     webhook_url: str | None
     created_at: datetime
     updated_at: datetime
