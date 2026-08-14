@@ -11,6 +11,7 @@ class LedgerEntry(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     payment_id: Mapped[str] = mapped_column(String, ForeignKey("payments.id"), nullable=False)
+    account: Mapped[str] = mapped_column(String, nullable=False)
     amount: Mapped[int] = mapped_column(Integer, nullable=False)
     entry_type: Mapped[LedgerEntryType] = mapped_column(SAEnum(LedgerEntryType), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),

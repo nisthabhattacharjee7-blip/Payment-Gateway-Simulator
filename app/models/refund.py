@@ -12,6 +12,7 @@ class Refund(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     payment_id: Mapped[str] = mapped_column(String, ForeignKey("payments.id"), nullable=False)
     amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    reason: Mapped[str] = mapped_column(String, nullable=True)
     status: Mapped[RefundStatus] = mapped_column(SAEnum(RefundStatus),default=RefundStatus.PENDING, nullable=False)                                                         
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
                                                 default=lambda: datetime.now(timezone.utc))
