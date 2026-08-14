@@ -1,5 +1,5 @@
 from app.models.payment import Payment
-from app.models.webhook_log import WebhookLog
+from app.models.webhook_log import WebhookStatus 
 from app.config.enums import PaymentStatus, Currency, WebhookStatus
 from app.services import webhook_service
 from app.utils.retry import calculate_backoff_seconds
@@ -22,7 +22,7 @@ def test_build_webhook_payload_has_correct_fields(db, test_merchant):
 
     payload = webhook_service.build_webhook_payload(payment, "payment.captured")
 
-    assert payload.event_type == "payment.captured"
+    assert payload.event == "payment.captured"
     assert payload.payment_id == payment.id
     assert payload.status == "captured"
     assert payload.amount == 50000
