@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+import app
 from app.db.session import get_db
 from app.models.merchant import Merchant
 from app.models.payment import Payment
@@ -9,6 +10,8 @@ from app.middlewares.auth_middleware import get_current_merchant
 from app.services import payment_service
 from app.services import webhook_service
 from app.services import state_machine
+from app.routers.dependencies import get_owned_payment
+
 
 router = APIRouter(prefix="/payments", tags=["refunds"])
 
