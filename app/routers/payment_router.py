@@ -11,6 +11,7 @@ from app.services import payment_service
 from app.services import webhook_service
 from app.services import state_machine
 from app.services import idempotency_service
+from app.routers.dependencies import get_owned_payment
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
