@@ -15,15 +15,14 @@ def build_webhook_payload(payment, event_type: str) -> WebhookPayload:
     ready to be sent to a merchant's webhook URL.
     """
     return WebhookPayload(
-        event_type=event_type,
-        payment_id=payment.id,
-        merchant_id=payment.merchant_id,
-        status=payment.status.value,
-        amount=payment.amount,
-        currency=payment.currency.value,
-        timestamp=datetime.now(timezone.utc),
-    )
-
+    event=event_type,
+    payment_id=payment.id,
+    merchant_id=payment.merchant_id,
+    status=payment.status.value,
+    amount=payment.amount,
+    currency=payment.currency.value,
+    timestamp=datetime.now(timezone.utc),
+)
 
 def create_webhook_log(
     db: Session, payment, event_type: str, payload: WebhookPayload
