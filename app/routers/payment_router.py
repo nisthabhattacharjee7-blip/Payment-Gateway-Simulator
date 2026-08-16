@@ -81,8 +81,8 @@ async def authorize_payment(
     merchant: Merchant = Depends(get_current_merchant),
     db: Session = Depends(get_db),
 ):
-    """
-    Sends the payment to the (simulated) bank for authorization"""
+
+    """Sends the payment to the (simulated) bank for authorization"""
     payment = _get_owned_payment(db, payment_id, merchant)
 
     try:
