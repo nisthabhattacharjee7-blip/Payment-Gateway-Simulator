@@ -82,8 +82,7 @@ async def authorize_payment(
     db: Session = Depends(get_db),
 ):
     """
-    Sends the payment to the (simulated) bank for authorization.
-    """
+    Sends the payment to the (simulated) bank for authorization"""
     payment = _get_owned_payment(db, payment_id, merchant)
 
     try:
@@ -100,7 +99,7 @@ async def authorize_payment(
     db.commit()
 
     if merchant.webhook_url:
-        await webhook_service.attempt_delivery(db, log, merchant.webhook_url)
+        await webhook_service.send_webhook(log, merchant.webhook_url, merchant.webhook_secret, db)
         db.commit()
         db.refresh(payment)
 
@@ -112,9 +111,7 @@ async def capture_payment(
     merchant: Merchant = Depends(get_current_merchant),
     db: Session = Depends(get_db),
 ):
-    """
-    Captures a previously authorized payment and records the ledger entry.
-    """
+    """Captures a previously authorized payment and records the ledger entry"""
     payment = _get_owned_payment(db, payment_id, merchant)
 
     try:
@@ -131,7 +128,7 @@ async def capture_payment(
     db.commit()
 
     if merchant.webhook_url:
-        await webhook_service.attempt_delivery(db, log, merchant.webhook_url)
+        await webhook_service.send_webhook(log, merchant.webhook_url, merchant.webhook_secret, db)
         db.commit()
         db.refresh(payment)
 

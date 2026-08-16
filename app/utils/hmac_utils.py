@@ -26,3 +26,20 @@ def verify_api_key(raw_key: str, stored_hash: str) -> bool:
     """
     computed_hash = hash_api_key(raw_key)
     return hmac.compare_digest(computed_hash, stored_hash)
+
+def generate_webhook_secret() -> str:
+    """
+    Generates a new webhook signing secret, shown to the merchant once.
+    Unlike API keys, this is stored raw (not hashed) — signing requires
+    the real value, not just something to compare against.
+    """
+    return f"whsec_{secrets.token_urlsafe(32)}"
+
+
+def sign_webhook_payload(payload: str, secret: str) -> str:
+    """
+    Produces an HMAC-SHA256 signature of a webhook payload using the
+    merchant's webhook secret. The merchant recomputes this on their end
+    to verify the webhook genuinely came from us and wasn't tampered with.
+    """
+    return hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()

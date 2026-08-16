@@ -50,7 +50,7 @@ async def retry_webhook(
             detail="Merchant has no webhook_url configured",
         )
 
-    await webhook_service.attempt_delivery(db, log, merchant.webhook_url)
+    await webhook_service.send_webhook(log, merchant.webhook_url, merchant.webhook_secret, db)
     db.commit()
     db.refresh(log)
     return log

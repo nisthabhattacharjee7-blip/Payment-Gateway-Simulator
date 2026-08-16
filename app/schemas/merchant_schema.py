@@ -14,5 +14,6 @@ class MerchantResponse(MerchantCreate):
     api_key: str
     email: EmailStr
     webhook_url: str | None
+    webhook_secret: str | None
     created_at: datetime
     updated_at: datetime

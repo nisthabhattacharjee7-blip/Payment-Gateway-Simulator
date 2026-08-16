@@ -16,7 +16,7 @@ class Merchant(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
                                                         onupdate=lambda: datetime.now(timezone.utc))
-
+    webhook_secret: Mapped[str] = mapped_column(String, nullable=True)
     payments: Mapped[list["Payment"]] = relationship("Payment", back_populates="merchant")
     wallet: Mapped["Wallet"] = relationship("Wallet", back_populates="merchant", uselist=False)
     webhook_logs: Mapped[list["WebhookLog"]] = relationship("WebhookLog", back_populates="merchant")
