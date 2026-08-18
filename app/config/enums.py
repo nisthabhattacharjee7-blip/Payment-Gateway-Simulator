@@ -37,4 +37,10 @@ class WebhookStatus(str, Enum):
     DELIVERED = "delivered"
     FAILED = "failed"        
     RETRYING = "retrying"
+
+class SettlementStatus(str, Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"    
     

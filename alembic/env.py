@@ -21,6 +21,7 @@ from app.models.ledger_entry import LedgerEntry
 from app.models.wallet import Wallet
 from app.models.webhook_log import WebhookLog
 from app.models.idempotency_key import IdempotencyKey
+from app.models.settlement import Settlement
 
 config = context.config
 

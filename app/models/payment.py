@@ -4,7 +4,6 @@ from sqlalchemy import ForeignKey, String, DateTime, Integer, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 from app.config.enums import Currency, PaymentStatus
-from app.models.merchant import Merchant
 
 
 class Payment(Base):
@@ -17,10 +16,11 @@ class Payment(Base):
     status: Mapped[PaymentStatus] = mapped_column(SAEnum(PaymentStatus), default=PaymentStatus.CREATED, nullable=False)
     receipt: Mapped[str] = mapped_column(String, nullable=True)
     description: Mapped[str] = mapped_column(String, nullable=True)
+    settlement_id: Mapped[str] = mapped_column(String, ForeignKey("settlements.id"), nullable=True)
+    settled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     merchant: Mapped["Merchant"] = relationship("Merchant", back_populates="payments")
     refunds: Mapped[list["Refund"]] = relationship("Refund", back_populates="payment")
     ledger_entries: Mapped[list["LedgerEntry"]] = relationship("LedgerEntry", back_populates="payment")
-    webhook_logs: Mapped[list["WebhookLog"]] = relationship("WebhookLog", back_populates="payment")

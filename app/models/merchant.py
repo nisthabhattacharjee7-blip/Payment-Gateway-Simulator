@@ -21,3 +21,4 @@ class Merchant(Base):
     wallet: Mapped["Wallet"] = relationship("Wallet", back_populates="merchant", uselist=False)
     webhook_logs: Mapped[list["WebhookLog"]] = relationship("WebhookLog", back_populates="merchant")
     idempotency_keys: Mapped[list["IdempotencyKey"]] = relationship("IdempotencyKey", back_populates="merchant")
+    settlements: Mapped[list["Settlement"]] = relationship("Settlement", back_populates="merchant")
