@@ -7,6 +7,7 @@ from app.routers import merchant_router
 from app.routers import payment_router
 from app.routers import refund_router
 from app.routers import webhook_router
+from app.routers import settlement_router
 
 app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION)
 
@@ -25,6 +26,7 @@ app.include_router(merchant_router.router)
 app.include_router(payment_router.router)
 app.include_router(refund_router.router)
 app.include_router(webhook_router.router)
+app.include_router(settlement_router.router)
 
 
 @app.get("/health")
