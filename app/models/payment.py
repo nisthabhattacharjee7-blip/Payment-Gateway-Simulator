@@ -24,3 +24,5 @@ class Payment(Base):
     merchant: Mapped["Merchant"] = relationship("Merchant", back_populates="payments")
     refunds: Mapped[list["Refund"]] = relationship("Refund", back_populates="payment")
     ledger_entries: Mapped[list["LedgerEntry"]] = relationship("LedgerEntry", back_populates="payment")
+    webhook_logs: Mapped[list["WebhookLog"]] = relationship("WebhookLog", back_populates="payment")
+    settlement: Mapped["Settlement"] = relationship("Settlement", back_populates="payments")
