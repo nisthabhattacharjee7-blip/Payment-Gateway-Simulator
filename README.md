@@ -1,96 +1,3 @@
-# Payment Gateway Simulator
-
-A backend simulation of a payment gateway — modeled after Razorpay, Stripe, Cashfree, and Juspay — built with FastAPI, SQLAlchemy, and PostgreSQL. Built as a deep-dive learning project into production-grade backend engineering: payment lifecycle state machines, idempotency, double-entry ledger bookkeeping, webhook delivery with exponential backoff, and API-key authentication.
-
----
-
-## Table of Contents
-
-- [What This Demonstrates](#what-this-demonstrates)
-- [Tech Stack](#tech-stack)
-- [Architecture](#architecture)
-- [Setup](#setup)
-- [Running Tests](#running-tests)
-- [API Overview](#api-overview)
-- [Known Limitations](#known-limitations)
-- [What I Learned](#what-i-learned)
-
----
-
-## What This Demonstrates
-
-This isn't a CRUD app — it models the actual hard problems a real payment gateway has to solve.
-
-**State machine–driven payment lifecycle**
-Payments move through `created → authorized → captured → settled`, with `failed` and `refunded` / `partially_refunded` branches. Every transition is validated against an explicit rules map before it's applied, so an illegal state change — like capturing an already-failed payment — is rejected at the service layer, not silently allowed.
-
-**Double-entry ledger bookkeeping**
-Every financial event (capture, refund) writes matching debit and credit entries to an append-only ledger table. Debits always equal credits across the system; nothing is ever edited or deleted, only reversed with new entries — mirroring how real financial audit trails work.
-
-**Idempotency protection**
-Duplicate requests — for example, from a merchant's network retry — are detected via an `Idempotency-Key` header, hashed and matched server-side, and replayed from a cached response instead of being processed twice.
-
-**Webhook delivery with exponential backoff**
-Payment status changes are pushed to a merchant's webhook URL. Failed deliveries are retried with exponentially increasing delays (2s, 4s, 8s...), capped at a maximum delay and eventually abandoned after a maximum attempt count.
-
-**Hashed API key authentication**
-Merchant API keys are generated with `secrets.token_urlsafe`, hashed with SHA-256 before storage, and compared using constant-time comparison to prevent timing attacks. The raw key is shown to the merchant exactly once, at creation.
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Web framework | FastAPI |
-| ORM | SQLAlchemy 2.0 (`Mapped` / `mapped_column` declarative style) |
-| Database | PostgreSQL |
-| Migrations | Alembic |
-| Validation | Pydantic |
-| Testing | pytest |
-| HTTP client | httpx (async, for webhook delivery) |
-
----
-
-## Architecture
-
-```
-app/
-├── config/       # enums (PaymentStatus, Currency, etc.) and settings
-├── db/           # SQLAlchemy engine/session setup
-├── models/       # ORM models — the database shape
-├── schemas/      # Pydantic models — the API request/response shape
-├── services/     # business logic: state machine, ledger, payments, webhooks
-├── middlewares/  # auth (API key) and idempotency dependencies
-├── routers/      # FastAPI route definitions
-└── main.py       # app entrypoint, router registration, exception handlers
-```
-
-Models and schemas are deliberately kept separate: models describe what's stored in the database, schemas describe what the API accepts and returns. Business rules — state transitions, refund limits, ledger balancing — live entirely in the `services/` layer, so routers stay thin and only handle HTTP concerns like auth, request parsing, and status codes.
-
----
-
-## Setup
-
-**Requirements:** Python 3.13+, PostgreSQL 18+
-
-### 1. Clone and install dependencies
-
-```bash
-git clone <repo-url>
-cd payment-gateway-simulator
-python -m venv venv
-venv\Scripts\activate          # Windows
-pip install -r requirements.txt
-```
-
-### 2. Configure environment
-
-Create a `.env` file in the project root:
-
-```
-DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/payment_gateway_db
-```
 
 ### 3. Create the database and run migrations
 
@@ -105,7 +12,7 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-Visit `http://127.0.0.1:8000/docs` for the interactive API documentation.
+Visit `http://127.0.0.1:8000/docs` for interactive API documentation, or `GET /health` for a liveness check.
 
 ---
 
@@ -115,11 +22,20 @@ Visit `http://127.0.0.1:8000/docs` for the interactive API documentation.
 pytest tests/ -v
 ```
 
-20 tests covering:
-- State machine transition rules, including rejection of illegal transitions
-- Double-entry ledger correctness — verifying debits always equal credits
-- Idempotency key hashing and lookup behavior
-- Webhook exponential backoff scheduling and max-attempt handling
+41 tests across 6 files:
+
+| File | Covers |
+|---|---|
+| `test_payment.py` | State machine transition rules (valid, invalid, terminal-state rejection) and payment/refund service behavior |
+| `test_ledger.py` | Double-entry correctness on capture and refund — debits always equal credits, wallet balances update correctly |
+| `test_settlement.py` | Settlement batch creation, eligibility filtering, per-payment ledger balancing, and idempotent re-batching |
+| `test_webhook.py` | Webhook payload construction, exponential backoff scheduling, and max-attempt failure handling |
+| `test_hmac.py` | API key generation/hashing/verification and webhook payload signing |
+| `test_idempotency.py` | Idempotency key hashing, lookup behavior, and duplicate-key/different-body rejection |
+
+Tests run against the configured database inside a per-test rolled-back transaction (see `conftest.py`).
+
+> **Note:** if you've added the settlement or idempotency regression tests from a self-audit, re-run `pytest tests/ -v | tail -1` and update the count above to match — don't leave a stale number here, it's the first thing a reviewer checks against the table.
 
 ---
 
@@ -130,13 +46,17 @@ pytest tests/ -v
 | `/merchants` | `POST` | Register a merchant, returns API key once |
 | `/merchants/me` | `GET` | Get the authenticated merchant's profile |
 | `/payments` | `POST` | Create a payment (idempotency-protected) |
+| `/payments/{id}` | `GET` | Fetch a payment by id |
 | `/payments/{id}/authorize` | `POST` | Send to simulated bank for authorization |
 | `/payments/{id}/capture` | `POST` | Capture an authorized payment, writes ledger entries |
-| `/payments/{id}/refunds` | `POST` | Full or partial refund |
+| `/payments/{id}/refunds` | `POST` | Full or partial refund, triggers a webhook event |
+| `/settlements/batch` | `POST` | Batch all captured-but-unsettled payments into a settlement |
+| `/settlements` | `GET` | List settlement batches for the authenticated merchant |
 | `/webhooks` | `GET` | List webhook delivery logs |
 | `/webhooks/{id}/retry` | `POST` | Manually trigger a webhook delivery attempt |
+| `/health` | `GET` | Liveness check |
 
-All payment, refund, and webhook routes require an `X-API-Key` header, obtained from `POST /merchants`.
+All merchant, payment, refund, settlement, and webhook routes (except registration and `/health`) require an `X-API-Key` header, obtained from `POST /merchants`.
 
 ---
 
@@ -144,16 +64,21 @@ All payment, refund, and webhook routes require an `X-API-Key` header, obtained 
 
 Built as a learning project — a few things are deliberately simplified rather than production-hardened:
 
-- The fake bank processor (`processor_simulator.py`) uses randomized outcomes (80% success / 15% decline / 5% timeout) rather than a real payment network integration.
-- Webhook delivery retries must be triggered manually via the `/retry` endpoint; there's no background scheduler polling for due retries.
-- Tests run against the real configured database inside a rolled-back transaction, rather than a fully isolated test database.
+- The fake bank processor (`processor_simulator.py`) uses randomized outcomes rather than a real payment network integration.
+- Settlement batching and webhook retries are triggered manually via their respective endpoints; there's no background scheduler polling for due batches or retries.
+- Tests run against the configured PostgreSQL database inside a rolled-back transaction, rather than a fully isolated test database or container.
+- No rate limiting or request-size limits on public-facing endpoints.
+- A payment that times out during authorization has no reconciliation path — it stays in `created` indefinitely rather than moving to a retryable or expired state.
+- Found and fixed during a self-audit: idempotency requests weren't hashing the real request body (so same-key/different-body reuse wasn't actually detected), and settlement ledger entries were attributed only to the first payment in a batch instead of one per payment. Both are fixed as of the current commit; see commit history for the specific changes.
 
 ---
 
 ## What I Learned
 
 - Why a data-driven state machine (a transition map plus a guard function) is cleaner and more testable than scattered if/else validation.
-- Why double-entry bookkeeping requires two entries per transaction, and why ledger tables should be append-only.
-- Why idempotency needs to be enforced at the request layer, not just the service layer, to correctly handle concurrent duplicate requests.
+- Why double-entry bookkeeping requires two entries per transaction, and why ledger tables should be append-only — and why that guarantee has to be enforced per-transaction, not just per-batch, or it silently breaks under batching.
+- Why idempotency needs to be enforced at the request layer, not just the service layer, to correctly handle concurrent duplicate requests — and why hashing the actual request body (not just the key) matters for catching key reuse with a different payload.
 - Why `hmac.compare_digest` matters when comparing secrets, and why API keys should be hashed like passwords rather than stored in plain text.
+- The difference between "settled" as a status flag and settlement as its own auditable entity — and why real gateways model it as a batch with its own ledger movement rather than just flipping a payment's status.
 - The importance of keeping ORM relationships (`back_populates`) consistent on both sides — and how SQLAlchemy fails loudly, but not always clearly, when they aren't.
+- The value of re-reading your own service-layer code adversarially after it's "done" — the settlement and idempotency bugs above passed code review by me the first time; they only surfaced under a deliberate audit.
