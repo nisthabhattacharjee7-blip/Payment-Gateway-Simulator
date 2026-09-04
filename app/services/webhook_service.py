@@ -3,26 +3,27 @@ import httpx
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from app.models.webhook_log import WebhookLog
-from app.config.enums import WebhookStatus, WebhookStatus
-from app.schemas.webhook_schema import  WebhookPayload
+from app.config.enums import WebhookStatus
+from app.schemas.webhook_schema import WebhookPayload
 from app.utils.retry import calculate_backoff_seconds
 from app.utils.hmac_utils import sign_webhook_payload
+from app.config.settings import settings
 
-MAX_WEBHOOK_ATTEMPTS = 5
 
 def build_webhook_payload(payment, event_type: str) -> WebhookPayload:
     """
     Builds the outbound payload describing a payment event,
     ready to be sent to a merchant's webhook URL"""
     return WebhookPayload(
-    event=event_type,
-    payment_id=payment.id,
-    merchant_id=payment.merchant_id,
-    status=payment.status.value,
-    amount=payment.amount,
-    currency=payment.currency.value,
-    timestamp=datetime.now(timezone.utc),
-)
+        event=event_type,
+        payment_id=payment.id,
+        merchant_id=payment.merchant_id,
+        status=payment.status.value,
+        amount=payment.amount,
+        currency=payment.currency.value,
+        timestamp=datetime.now(timezone.utc),
+    )
+
 
 def create_webhook_log(
     db: Session, payment, event_type: str, payload: WebhookPayload
@@ -41,6 +42,7 @@ def create_webhook_log(
     db.add(log)
     db.flush()
     return log
+
 
 async def send_webhook(log: WebhookLog, webhook_url: str, webhook_secret: str, db: Session):
     """
@@ -80,11 +82,12 @@ async def send_webhook(log: WebhookLog, webhook_url: str, webhook_secret: str, d
 
     db.flush()
 
+
 def _schedule_retry_or_fail(log: WebhookLog) -> None:
     """
     Decides whether to schedule another retry attempt or give up,
     based on how many attempts have already been made"""
-    if log.attempt_count >= MAX_WEBHOOK_ATTEMPTS:
+    if log.attempt_count >= settings.MAX_WEBHOOK_ATTEMPTS:
         log.status = WebhookStatus.FAILED
         log.next_retry_at = None
     else:
@@ -92,4 +95,4 @@ def _schedule_retry_or_fail(log: WebhookLog) -> None:
         backoff_seconds = calculate_backoff_seconds(log.attempt_count)
         log.next_retry_at = datetime.now(timezone.utc) + timedelta(
             seconds=backoff_seconds
-        )    
+        )
