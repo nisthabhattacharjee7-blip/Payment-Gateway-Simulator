@@ -1,10 +1,13 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 from app.db.session import get_db
+from app.models import merchant
+from app.models import merchant
 from app.models.merchant import Merchant
 from app.middlewares.auth_middleware import get_current_merchant
 from app.schemas.merchant_schema import MerchantResponse, MerchantCreate
 from app.utils.hmac_utils import generate_api_key, hash_api_key, generate_webhook_secret
+from app.middlewares.rate_limiter import limiter
 
 router = APIRouter(prefix="/merchants", tags=["merchants"])
 
@@ -34,4 +37,9 @@ def get_my_merchant_profile(merchant: Merchant = Depends(get_current_merchant)):
     Returns the profile of the merchant identified by the request's
     X-API-Key header.
     """
+    return merchant
+
+@router.post("", response_model=MerchantResponse, status_code=201)
+@limiter.limit("5/minute")
+def create_merchant(request: Request, payload: MerchantCreate, db: Session = Depends(get_db)):
     return merchant

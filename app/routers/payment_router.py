@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.models import payment
 from app.models.merchant import Merchant
 from app.models.payment import Payment
 from app.schemas.payment_schema import PaymentCreate, PaymentResponse
@@ -12,6 +13,8 @@ from app.services import webhook_service
 from app.services import state_machine
 from app.services import idempotency_service
 from app.routers.dependencies import get_owned_payment
+from app.middlewares.rate_limiter import limiter
+
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -131,5 +134,16 @@ async def capture_payment(
         await webhook_service.send_webhook(log, merchant.webhook_url, merchant.webhook_secret, db)
         db.commit()
         db.refresh(payment)
+    return payment
+    
 
+@router.post("", response_model=PaymentResponse, status_code=201)
+@limiter.limit("20/minute")
+def create_payment(
+    request: Request,
+    payload: PaymentCreate,
+    merchant: Merchant = Depends(get_current_merchant),
+    db: Session = Depends(get_db),
+    idempotency_record=Depends(check_idempotency),
+):
     return payment
