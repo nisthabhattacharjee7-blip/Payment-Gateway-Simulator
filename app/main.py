@@ -85,3 +85,13 @@ def health_check():
     Basic liveness check — confirms the API is running.
     """
     return {"status": "ok"}
+
+from contextlib import asynccontextmanager
+from app.services.scheduler import start_scheduler, stop_scheduler
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    start_scheduler()
+    yield
+    stop_scheduler()
+app = FastAPI(title=settings.APP_NAME, version=settings.APP_VERSION, lifespan=lifespan)
