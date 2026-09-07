@@ -1,10 +1,9 @@
 import asyncio
 import logging
 from datetime import datetime, timezone
-
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-
+from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.models.webhook_log import WebhookLog
 from app.config.enums import WebhookStatus
 from app.services import webhook_service
@@ -12,18 +11,18 @@ from app.services import webhook_service
 logger = logging.getLogger(__name__)
 
 
-async def redrive_due_webhooks() -> None:
+async def redrive_due_webhooks(db: Session | None = None) -> None:
    
     """Polls for webhook logs in RETRYING status whose next_retry_at has
-    passed, and redrives delivery for each — the automated equivalent
-    of a merchant hitting POST /webhooks/{id}/retry.
-
-    This is what closes the previously-documented limitation that
-    webhook retries only fired when someone manually called the retry
-    endpoint. Runs on its own DB session per tick, since this executes
-    outside any request lifecycle and can't reuse a request-scoped session"""
+    passed, and redrives delivery for each. Accepts an optional db
+    session so tests can pass in the same transaction-scoped session
+    the test fixture uses — opening a separate SessionLocal() would use
+    a different connection and never see uncommitted test data"""
     
-    db = SessionLocal()
+    owns_session = db is None
+    if owns_session:
+        db = SessionLocal()
+
     try:
         due_logs = (
             db.query(WebhookLog)
@@ -37,27 +36,21 @@ async def redrive_due_webhooks() -> None:
         for log in due_logs:
             merchant = log.merchant
             if not merchant.webhook_url:
-                # Merchant removed their webhook_url after the log was
-                # created — nowhere to deliver to, so mark it FAILED
-                # instead of leaving it stuck retrying forever.
                 log.status = WebhookStatus.FAILED
                 log.next_retry_at = None
                 continue
-
             try:
                 await webhook_service.send_webhook(
                     log, merchant.webhook_url, merchant.webhook_secret, db
                 )
             except Exception:
-                # A single delivery failure must not crash the whole
-                # scheduler tick — log it and let this entry's own
-                # backoff/max-attempt logic (already inside send_webhook)
-                # handle the retry state.
                 logger.exception("Scheduled webhook redrive failed for log %s", log.id)
 
-        db.commit()
+        if owns_session:
+            db.commit()
     finally:
-        db.close()
+        if owns_session:
+            db.close()
 
 
 scheduler = AsyncIOScheduler()
@@ -76,3 +69,4 @@ def start_scheduler() -> None:
 
 def stop_scheduler() -> None:
     scheduler.shutdown(wait=False)
+

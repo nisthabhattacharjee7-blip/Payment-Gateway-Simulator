@@ -1,5 +1,5 @@
 def test_payment_creation_rate_limit_returns_429(client, test_merchant):
-    headers = {"X-API-Key": test_merchant.raw_api_key}
+    headers = {"X-API-Key": "test-api-key"}
     payload = {"amount": 1000, "currency": "INR"}
 
     responses = [

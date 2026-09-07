@@ -3,7 +3,11 @@ from app.models.webhook_log import WebhookStatus
 from app.config.enums import PaymentStatus, Currency, WebhookStatus
 from app.services import webhook_service
 from app.utils.retry import calculate_backoff_seconds
+from app.config.settings import settings
 
+def test_redrive_due_webhooks_picks_up_past_due_retries(db, test_merchant):
+    payment = _make_payment(db, test_merchant)
+    ...
 
 def _make_payment(db, merchant):
     payment = Payment(
@@ -61,7 +65,7 @@ def test_schedule_retry_or_fail_marks_failed_after_max_attempts(db, test_merchan
     payload = webhook_service.build_webhook_payload(payment, "payment.captured")
     log = webhook_service.create_webhook_log(db, payment, "payment.captured", payload)
 
-    log.attempt_count = webhook_service.MAX_WEBHOOK_ATTEMPTS
+    log.attempt_count = settings.MAX_WEBHOOK_ATTEMPTS
 
     webhook_service._schedule_retry_or_fail(log)
 

@@ -35,7 +35,10 @@ def _get_owned_payment(db: Session, payment_id: str, merchant: Merchant) -> Paym
 
 
 @router.post("", response_model=PaymentResponse, status_code=201)
+@limiter.limit("20/minute")
+
 def create_payment(
+    request: Request,
     payload: PaymentCreate,
     merchant: Merchant = Depends(get_current_merchant),
     db: Session = Depends(get_db),
@@ -136,14 +139,3 @@ async def capture_payment(
         db.refresh(payment)
     return payment
     
-
-@router.post("", response_model=PaymentResponse, status_code=201)
-@limiter.limit("20/minute")
-def create_payment(
-    request: Request,
-    payload: PaymentCreate,
-    merchant: Merchant = Depends(get_current_merchant),
-    db: Session = Depends(get_db),
-    idempotency_record=Depends(check_idempotency),
-):
-    return payment
