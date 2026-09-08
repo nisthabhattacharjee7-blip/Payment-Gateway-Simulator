@@ -111,7 +111,7 @@ Visit `http://127.0.0.1:8000/docs` for interactive API documentation, or `GET /h
 
     pytest tests/ -v
 
-41 tests across 6 files:
+44 tests across 8 files:
 
 | File | Covers |
 |---|---|
@@ -121,12 +121,10 @@ Visit `http://127.0.0.1:8000/docs` for interactive API documentation, or `GET /h
 | `test_webhook.py` | Webhook payload construction, exponential backoff scheduling, and max-attempt failure handling |
 | `test_hmac.py` | API key generation/hashing/verification and webhook payload signing |
 | `test_idempotency.py` | Idempotency key hashing, lookup behavior, and duplicate-key/different-body rejection |
+| `test_rate_limit.py` | Per-merchant rate limiting on payment creation returns 429 once the limit is exceeded |
+| `test_scheduler.py` | Background scheduler correctly redrives due webhook retries |
 
 Tests run against the configured database inside a per-test rolled-back transaction (see `conftest.py`).
-
-> **Note:** if you've added the settlement or idempotency regression tests from a self-audit, re-run `pytest tests/ -v | tail -1` and update the count above to match — don't leave a stale number here, it's the first thing a reviewer checks against the table.
-
----
 
 ## API Overview
 
