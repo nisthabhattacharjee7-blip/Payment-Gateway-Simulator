@@ -102,3 +102,67 @@ def test_partial_refund_moves_payment_to_partially_refunded_status(db, test_merc
 
     payment_service.refund_payment(db, payment, refund_amount=20000)
     assert payment.status == PaymentStatus.PARTIALLY_REFUNDED
+
+def test_partial_capture_records_correct_captured_amount(db, test_merchant):
+    payment = Payment(
+        merchant_id=test_merchant.id,
+        amount=50000,
+        currency=Currency.INR,
+        status=PaymentStatus.AUTHORIZED,
+    )
+    db.add(payment)
+    db.flush()
+
+    result = payment_service.capture_payment(db, payment, amount=30000)
+
+    assert result.status == PaymentStatus.CAPTURED
+    assert result.captured_amount == 30000
+    assert result.amount == 50000
+
+
+def test_capture_without_amount_defaults_to_full_authorized_amount(db, test_merchant):
+    payment = Payment(
+        merchant_id=test_merchant.id,
+        amount=50000,
+        currency=Currency.INR,
+        status=PaymentStatus.AUTHORIZED,
+    )
+    db.add(payment)
+    db.flush()
+
+    result = payment_service.capture_payment(db, payment)
+
+    assert result.captured_amount == 50000
+
+
+def test_capture_amount_exceeding_authorized_amount_is_rejected(db, test_merchant):
+    payment = Payment(
+        merchant_id=test_merchant.id,
+        amount=50000,
+        currency=Currency.INR,
+        status=PaymentStatus.AUTHORIZED,
+    )
+    db.add(payment)
+    db.flush()
+
+    with pytest.raises(ValueError):
+        payment_service.capture_payment(db, payment, amount=60000)
+
+
+def test_refund_is_bounded_by_captured_amount_not_authorized_amount(db, test_merchant):
+    payment = Payment(
+        merchant_id=test_merchant.id,
+        amount=50000,
+        currency=Currency.INR,
+        status=PaymentStatus.AUTHORIZED,
+    )
+    db.add(payment)
+    db.flush()
+
+    payment_service.capture_payment(db, payment, amount=30000)
+
+    with pytest.raises(ValueError):
+        payment_service.refund_payment(db, payment, refund_amount=40000)
+
+    payment_service.refund_payment(db, payment, refund_amount=30000)
+    assert payment.status == PaymentStatus.REFUNDED    

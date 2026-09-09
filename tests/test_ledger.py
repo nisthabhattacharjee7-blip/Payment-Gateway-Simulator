@@ -1,6 +1,7 @@
 from app.models.payment import Payment
+from app.models.wallet import Wallet
 from app.config.enums import PaymentStatus, Currency, LedgerEntryType
-from app.services import ledger_service
+from app.services import ledger_service,payment_service
 from app.models.ledger_entry import LedgerEntry
 
 
@@ -84,3 +85,23 @@ def test_partial_refund_leaves_correct_remaining_balance(db, test_merchant):
 
     wallet = ledger_service.get_or_create_wallet(db, test_merchant.id)
     assert wallet.balance == 70000
+
+def test_partial_capture_ledger_entries_reflect_captured_amount_not_authorized_amount(db, test_merchant):
+    payment = Payment(
+        merchant_id=test_merchant.id,
+        amount=50000,
+        currency=Currency.INR,
+        status=PaymentStatus.AUTHORIZED,
+    )
+    db.add(payment)
+    db.flush()
+
+    payment_service.capture_payment(db, payment, amount=30000)
+
+    entries = db.query(LedgerEntry).filter(LedgerEntry.payment_id == payment.id).all()
+    assert len(entries) == 2
+    for entry in entries:
+        assert entry.amount == 30000
+
+    wallet = db.query(Wallet).filter_by(merchant_id=test_merchant.id).first()
+    assert wallet.balance == 30000    
