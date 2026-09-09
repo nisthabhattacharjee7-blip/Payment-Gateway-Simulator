@@ -99,31 +99,4 @@ async def authorize_payment(
 
     return payment
 
-@router.post("/{payment_id}/capture", response_model=PaymentResponse)
-async def capture_payment(
-    payment_id: str,
-    merchant: Merchant = Depends(get_current_merchant),
-    db: Session = Depends(get_db),
-):
-    """Captures a previously authorized payment and records the ledger entry"""
-    payment = _get_owned_payment(db, payment_id, merchant)
-
-    try:
-        payment = payment_service.capture_payment(db, payment)
-    except state_machine.InvalidTransitionError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
-
-    db.commit()
-    db.refresh(payment)
-
-    event_type = f"payment.{payment.status.value}"
-    webhook_payload = webhook_service.build_webhook_payload(payment, event_type)
-    log = webhook_service.create_webhook_log(db, payment, event_type, webhook_payload)
-    db.commit()
-
-    if merchant.webhook_url:
-        await webhook_service.send_webhook(log, merchant.webhook_url, merchant.webhook_secret, db)
-        db.commit()
-        db.refresh(payment)
-    return payment
-    
+ 
