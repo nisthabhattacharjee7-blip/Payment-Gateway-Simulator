@@ -18,6 +18,7 @@ class Payment(Base):
     description: Mapped[str] = mapped_column(String, nullable=True)
     settlement_id: Mapped[str] = mapped_column(String, ForeignKey("settlements.id"), nullable=True)
     settled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    captured_amount: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

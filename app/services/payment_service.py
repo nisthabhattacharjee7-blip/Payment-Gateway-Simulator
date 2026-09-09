@@ -56,17 +56,28 @@ def authorize_payment(db: Session, payment: Payment) -> Payment:
     return payment
 
 
-def capture_payment(db: Session, payment: Payment) -> Payment:
-
+def capture_payment(db: Session, payment: Payment, amount: int | None = None) -> Payment:
     """
     Captures a previously authorized payment: moves it to CAPTURED
     and records the corresponding double-entry ledger transaction.
+
+    amount defaults to the full authorized amount (payment.amount) if
+    not provided. A partial capture (amount < payment.amount) is
+    allowed exactly once — this is a single-capture model, not
+    multi-capture: whatever isn't captured now is never captured later.
     """
+    capture_amount = amount if amount is not None else payment.amount
+
+    if capture_amount > payment.amount:
+        raise ValueError(
+            f"Capture amount {capture_amount} exceeds authorized amount {payment.amount}"
+        )
 
     new_status = state_machine.transition(payment.status, PaymentStatus.CAPTURED)
     payment.status = new_status
+    payment.captured_amount = capture_amount
 
-    ledger_service.record_capture(db, payment)
+    ledger_service.record_capture(db, payment, capture_amount)
 
     db.flush()
     return payment
@@ -80,7 +91,7 @@ def refund_payment(
     ledger transaction.
     """
     already_refunded = sum(r.amount for r in payment.refunds)
-    remaining_refundable = payment.amount - already_refunded
+    remaining_refundable = (payment.captured_amount or payment.amount) - already_refunded
 
     if refund_amount > remaining_refundable:
         raise ValueError(

@@ -5,7 +5,7 @@ from app.db.session import get_db
 from app.models import payment
 from app.models.merchant import Merchant
 from app.models.payment import Payment
-from app.schemas.payment_schema import PaymentCreate, PaymentResponse
+from app.schemas.payment_schema import PaymentCreate, PaymentResponse,PaymentCaptureRequest
 from app.middlewares.auth_middleware import get_current_merchant
 from app.middlewares.idempotency_middleware import check_idempotency
 from app.services import payment_service
@@ -34,39 +34,27 @@ def _get_owned_payment(db: Session, payment_id: str, merchant: Merchant) -> Paym
     return payment
 
 
-@router.post("", response_model=PaymentResponse, status_code=201)
-@limiter.limit("20/minute")
-
-def create_payment(
-    request: Request,
-    payload: PaymentCreate,
+@router.post("/{payment_id}/capture", response_model=PaymentResponse)
+async def capture_payment(
+    payment_id: str,
+    payload: PaymentCaptureRequest | None = None,
     merchant: Merchant = Depends(get_current_merchant),
     db: Session = Depends(get_db),
-    idempotency_record=Depends(check_idempotency),
 ):
     """
-    Creates a new payment in the CREATED state for the authenticated merchant.
-    Protected by idempotency: retrying with the same Idempotency-Key header
-    will replay the original response instead of creating a duplicate payment.
+    Captures a previously authorized payment and records the ledger entry.
+    Accepts an optional {"amount": N} body for a partial capture; if
+    omitted, captures the full authorized amount.
     """
-    payment = payment_service.create_payment(
-        db=db,
-        merchant_id=merchant.id,
-        amount=payload.amount,
-        currency=payload.currency,
-        receipt=payload.receipt,
-        description=payload.description,
-    )
-    db.commit()
-    db.refresh(payment)
+    payment = _get_owned_payment(db, payment_id, merchant)
+    requested_amount = payload.amount if payload else None
 
-    response_data = PaymentResponse.model_validate(payment).model_dump(mode="json")
-    idempotency_service.save_idempotency_response(
-        db, idempotency_record, status_code=201, response_body=response_data
-    )
-    db.commit()
-
-    return payment
+    try:
+        payment = payment_service.capture_payment(db, payment, requested_amount)
+    except state_machine.InvalidTransitionError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
 
 @router.get("/{payment_id}", response_model=PaymentResponse)
