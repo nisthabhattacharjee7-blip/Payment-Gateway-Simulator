@@ -1,18 +1,18 @@
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.models import merchant
-from app.models import merchant
 from app.models.merchant import Merchant
 from app.middlewares.auth_middleware import get_current_merchant
 from app.schemas.merchant_schema import MerchantResponse, MerchantCreate
-from app.utils.hmac_utils import generate_api_key, hash_api_key, generate_webhook_secret
+from app.utils.hmac_utils import generate_api_key, hash_api_key, get_key_prefix, generate_webhook_secret
 from app.middlewares.rate_limiter import limiter
 
 router = APIRouter(prefix="/merchants", tags=["merchants"])
 
+
 @router.post("", response_model=MerchantResponse, status_code=201)
-def create_merchant(payload: MerchantCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def create_merchant(request: Request, payload: MerchantCreate, db: Session = Depends(get_db)):
     raw_api_key = generate_api_key()
     raw_webhook_secret = generate_webhook_secret()
 
@@ -21,6 +21,7 @@ def create_merchant(payload: MerchantCreate, db: Session = Depends(get_db)):
         email=payload.email,
         webhook_url=payload.webhook_url,
         api_key=hash_api_key(raw_api_key),
+        key_prefix=get_key_prefix(raw_api_key),
         webhook_secret=raw_webhook_secret,
     )
     db.add(merchant)
@@ -31,15 +32,11 @@ def create_merchant(payload: MerchantCreate, db: Session = Depends(get_db)):
     response.api_key = raw_api_key
     return response
 
+
 @router.get("/me", response_model=MerchantResponse)
 def get_my_merchant_profile(merchant: Merchant = Depends(get_current_merchant)):
     """
     Returns the profile of the merchant identified by the request's
     X-API-Key header.
     """
-    return merchant
-
-@router.post("", response_model=MerchantResponse, status_code=201)
-@limiter.limit("5/minute")
-def create_merchant(request: Request, payload: MerchantCreate, db: Session = Depends(get_db)):
     return merchant

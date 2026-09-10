@@ -68,3 +68,29 @@ def test_sign_webhook_payload_differs_for_different_payloads():
     signature_a = sign_webhook_payload('{"amount": 50000}', secret)
     signature_b = sign_webhook_payload('{"amount": 70000}', secret)
     assert signature_a != signature_b
+
+def test_get_key_prefix_returns_expected_length():
+    from app.utils.hmac_utils import get_key_prefix
+    raw_key = "pgs_abcdefghijklmnopqrstuvwxyz"
+    assert get_key_prefix(raw_key) == "pgs_abcdefgh"
+    assert len(get_key_prefix(raw_key)) == 12
+
+
+def test_verify_api_key_via_prefix_lookup_end_to_end(db):
+    from app.models.merchant import Merchant
+    from app.utils.hmac_utils import generate_api_key, hash_api_key, get_key_prefix, verify_api_key
+
+    raw_key = generate_api_key()
+    merchant = Merchant(
+        name="Prefix Test Merchant",
+        email="prefix-test@example.com",
+        api_key=hash_api_key(raw_key),
+        key_prefix=get_key_prefix(raw_key),
+    )
+    db.add(merchant)
+    db.flush()
+
+    found = db.query(Merchant).filter(Merchant.key_prefix == get_key_prefix(raw_key)).first()
+    assert found is not None
+    assert verify_api_key(raw_key, found.api_key) is True
+    assert verify_api_key("wrong_key_entirely", found.api_key) is False    

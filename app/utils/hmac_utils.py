@@ -18,6 +18,16 @@ def generate_api_key() -> str:
     """
     return f"pgs_{secrets.token_urlsafe(32)}"
 
+def get_key_prefix(raw_key: str, length: int = 12) -> str:
+    """
+    Extracts a short, non-secret prefix from a raw API key, used for
+    fast DB lookup (indexed) before the real constant-time comparison
+    against the full hash. Mirrors how Stripe/Razorpay-style key
+    schemes let you find the right row without scanning every
+    merchant's hash — the prefix alone doesn't grant access, it just
+    narrows the search to one candidate row.
+    """
+    return raw_key[:length]
 
 def verify_api_key(raw_key: str, stored_hash: str) -> bool:
     """
