@@ -33,6 +33,38 @@ def _get_owned_payment(db: Session, payment_id: str, merchant: Merchant) -> Paym
 
     return payment
 
+@router.post("", response_model=PaymentResponse, status_code=201)
+@limiter.limit("20/minute")
+def create_payment(
+    request: Request,
+    payload: PaymentCreate,
+    merchant: Merchant = Depends(get_current_merchant),
+    db: Session = Depends(get_db),
+    idempotency_record=Depends(check_idempotency),
+):
+    """
+    Creates a new payment in the CREATED state for the authenticated merchant.
+    Protected by idempotency: retrying with the same Idempotency-Key header
+    will replay the original response instead of creating a duplicate payment.
+    """
+    payment = payment_service.create_payment(
+        db=db,
+        merchant_id=merchant.id,
+        amount=payload.amount,
+        currency=payload.currency,
+        receipt=payload.receipt,
+        description=payload.description,
+    )
+    db.commit()
+    db.refresh(payment)
+
+    response_data = PaymentResponse.model_validate(payment).model_dump(mode="json")
+    idempotency_service.save_idempotency_response(
+        db, idempotency_record, status_code=201, response_body=response_data
+    )
+    db.commit()
+
+    return payment
 
 @router.post("/{payment_id}/capture", response_model=PaymentResponse)
 async def capture_payment(
