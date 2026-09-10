@@ -40,6 +40,11 @@ Payment and refund status changes are pushed to a merchant's webhook URL, signed
 **Hashed API key authentication**
 Merchant API keys are generated with `secrets.token_urlsafe`, hashed before storage, and compared using constant-time comparison to prevent timing attacks. The raw key is returned to the merchant exactly once, at creation.
 
+**Hashed API key authentication with prefix-based lookup**
+Merchant API keys are generated with `secrets.token_urlsafe`, hashed before storage, and compared using constant-time comparison to prevent timing attacks. Rather than scanning the full hash column to authenticate, a short non-secret prefix of the key (analogous to Stripe's `sk_live_...` scheme) is stored and indexed separately, narrowing the DB lookup to a single candidate row before the real constant-time comparison runs — the same two-step pattern real payment gateways use for API key auth. The raw key is returned to the merchant exactly once, at creation.
+
+**Partial capture**
+A payment can be captured for less than its authorized amount in a single capture call. The remaining authorized amount is never captured after that — this is a single-capture model, not multi-capture. Refunds are bounded by the amount actually captured, not the original authorized amount, so a merchant can never refund money that was never collected.
 ---
 
 ## Tech Stack
@@ -111,15 +116,15 @@ Visit `http://127.0.0.1:8000/docs` for interactive API documentation, or `GET /h
 
     pytest tests/ -v
 
-44 tests across 8 files:
+51 tests across 8 files:
 
 | File | Covers |
 |---|---|
-| `test_payment.py` | State machine transition rules (valid, invalid, terminal-state rejection) and payment/refund service behavior |
-| `test_ledger.py` | Double-entry correctness on capture and refund — debits always equal credits, wallet balances update correctly |
+| `test_payment.py` | State machine transition rules, payment/refund service behavior, and partial capture (amount validation, refund bounded by captured amount) |
+| `test_ledger.py` | Double-entry correctness on capture, partial capture, and refund — debits always equal credits, wallet balances update correctly |
 | `test_settlement.py` | Settlement batch creation, eligibility filtering, per-payment ledger balancing, and idempotent re-batching |
 | `test_webhook.py` | Webhook payload construction, exponential backoff scheduling, and max-attempt failure handling |
-| `test_hmac.py` | API key generation/hashing/verification and webhook payload signing |
+| `test_hmac.py` | API key generation/hashing/verification, key-prefix lookup, and webhook payload signing |
 | `test_idempotency.py` | Idempotency key hashing, lookup behavior, and duplicate-key/different-body rejection |
 | `test_rate_limit.py` | Per-merchant rate limiting on payment creation returns 429 once the limit is exceeded |
 | `test_scheduler.py` | Background scheduler correctly redrives due webhook retries |
