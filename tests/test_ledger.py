@@ -24,7 +24,7 @@ def test_record_capture_creates_balanced_ledger_entries(db, test_merchant):
     """
     payment = _make_captured_payment(db, test_merchant, amount=50000)
 
-    ledger_service.record_capture(db, payment)
+    ledger_service.record_capture(db, payment, payment.amount)
 
     entries = db.query(LedgerEntry).filter(LedgerEntry.payment_id == payment.id).all()
 
@@ -45,7 +45,7 @@ def test_record_capture_updates_wallet_balance(db, test_merchant):
     """
     payment = _make_captured_payment(db, test_merchant, amount=50000)
 
-    ledger_service.record_capture(db, payment)
+    ledger_service.record_capture(db, payment, payment.amount)
 
     wallet = ledger_service.get_or_create_wallet(db, test_merchant.id)
     assert wallet.balance == 50000
@@ -58,7 +58,7 @@ def test_record_refund_reverses_the_ledger_correctly(db, test_merchant):
     to the original capture.
     """
     payment = _make_captured_payment(db, test_merchant, amount=50000)
-    ledger_service.record_capture(db, payment)
+    ledger_service.record_capture(db, payment, payment.amount)
 
     ledger_service.record_refund(db, payment, refund_amount=50000)
 
@@ -79,7 +79,7 @@ def test_partial_refund_leaves_correct_remaining_balance(db, test_merchant):
     refunded amount, leaving the rest intact.
     """
     payment = _make_captured_payment(db, test_merchant, amount=100000)
-    ledger_service.record_capture(db, payment)
+    ledger_service.record_capture(db, payment, payment.amount)
 
     ledger_service.record_refund(db, payment, refund_amount=30000)
 
